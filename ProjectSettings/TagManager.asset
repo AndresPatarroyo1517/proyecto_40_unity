@@ -6,6 +6,7 @@ TagManager:
   tags:
   - Recolectable
   - PowerUp
+  - Trap
   layers:
   - Default
   - TransparentFX

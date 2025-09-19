@@ -13,7 +13,9 @@ MonoBehaviour:
   m_Name: Invencibilidad
   m_EditorClassIdentifier: 
   type: 1
-  duration: 2
+  duration: 10
   multiplier: 2
   displayName: '"Se ha aplicado un buff de invencibilidad"'
+  description: "Descripci\xF3n del power-up"
   effectColor: {r: 0.013883919, g: 0.77816516, b: 0.9811321, a: 1}
+  icon: {fileID: 0}

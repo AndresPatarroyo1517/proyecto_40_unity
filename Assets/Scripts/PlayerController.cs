@@ -34,6 +34,8 @@ public class PlayerController : MonoBehaviour
     private Renderer playerRenderer;
     private Material originalMaterial;
     
+    private DeathManager deathManager;
+    
     private int coinCount = 0;
     private bool isGrounded;
     private float currentSpeed;
@@ -56,6 +58,7 @@ public class PlayerController : MonoBehaviour
         audioSource = GetComponent<AudioSource>();
         playerRenderer = GetComponent<Renderer>();
         gameManager = FindObjectOfType<GameManager>();
+	deathManager = FindObjectOfType<DeathManager>();
         
         if (particleTransform != null)
             particleSystem = particleTransform.GetComponent<ParticleSystem>();
@@ -273,6 +276,17 @@ public class PlayerController : MonoBehaviour
         {
             CollectPowerUp(other.gameObject);
         }
+	else if (other.CompareTag("Trap")) 
+    {
+        if (deathManager != null && !HasPowerUp(PowerUpType.Invincibility))
+        {
+            deathManager.TriggerDeath("¡Tocaste una trampa!");
+        }
+        else if (HasPowerUp(PowerUpType.Invincibility))
+        {
+            Debug.Log("¡Invencibilidad te protegió de la trampa!");
+        }
+    }
     }
     
     void CollectCoin(GameObject coin)
@@ -357,7 +371,6 @@ public class PlayerController : MonoBehaviour
         }
     }
     
-    // Método público para que el portal pueda cargar el siguiente nivel
     public void LoadNextLevel()
     {
         if (nextSceneIndex < SceneManager.sceneCountInBuildSettings)

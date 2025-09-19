@@ -5,13 +5,13 @@ using UnityEngine.SceneManagement;
 
 public class Meta : MonoBehaviour
 {
-    [Header("Goal Settings")]
+    [Header("Ajustes")]
     public int requiredCoins = 50;
     
-    [Header("Trigger Settings")]
+    [Header("Trigger")]
     public GameObject triggerObject;
     
-    [Header("Visual Feedback")]
+    [Header("Visual")]
     public GameObject activatedEffect;
     
     private PlayerController playerController;
