@@ -6,26 +6,26 @@ using TMPro;
 
 public class PlayerController : MonoBehaviour
 {
-    [Header("Movement")]
+    [Header("Movimiento")]
     public float baseSpeed = 5f;
-    public float jumpForce = 10f;
+    public float jumpForce = 3f;
     public float maxVelocity = 10f;
     
-    [Header("Ground Check")]
+    [Header("Piso")]
     public Transform groundCheck;
     public float groundDistance = 0.4f;
     public LayerMask groundMask;
     
-    [Header("UI References")]
+    [Header("UI")]
     public TextMeshProUGUI coinText;
     public TextMeshProUGUI powerUpText;
     
-    [Header("Effects")]
+    [Header("Efectos")]
     public Transform particleTransform;
     public Material invincibilityMaterial;
     
-    [Header("Game Settings")]
-    public int coinsToWin = 12;
+    [Header("Ajustes")]
+    public int coinsToWin = 50;
     public int nextSceneIndex = 1;
     
     private Rigidbody rb;
@@ -39,22 +39,23 @@ public class PlayerController : MonoBehaviour
     private float currentSpeed;
     private int coinMultiplier = 1;
     
-    // Optimización: Cache para reducir llamadas a Update
-    private float groundCheckTimer = 0f;
-    private const float GROUND_CHECK_INTERVAL = 0.1f;
-    
     private List<ActivePowerUp> activePowerUps = new List<ActivePowerUp>();
     private Dictionary<PowerUpType, bool> powerUpStates = new Dictionary<PowerUpType, bool>();
     
-    // Flags para actualización de UI solo cuando sea necesario
     private bool uiNeedsUpdate = true;
     private bool powerUpUINeedsUpdate = false;
+
+    public int CoinCount => coinCount;
+    public int CoinsToWin => coinsToWin;
+    
+    private GameManager gameManager;
     
     void Start()
     {
         rb = GetComponent<Rigidbody>();
         audioSource = GetComponent<AudioSource>();
         playerRenderer = GetComponent<Renderer>();
+        gameManager = FindObjectOfType<GameManager>();
         
         if (particleTransform != null)
             particleSystem = particleTransform.GetComponent<ParticleSystem>();
@@ -86,18 +87,10 @@ public class PlayerController : MonoBehaviour
     
     void Update()
     {
-        // Optimización: Ground check solo cada GROUND_CHECK_INTERVAL segundos
-        groundCheckTimer += Time.deltaTime;
-        if (groundCheckTimer >= GROUND_CHECK_INTERVAL)
-        {
-            CheckGrounded();
-            groundCheckTimer = 0f;
-        }
-        
+        CheckGrounded();
         HandleJumpInput();
         UpdatePowerUps();
         
-        // Solo actualizar UI cuando sea necesario
         if (uiNeedsUpdate)
         {
             UpdateUI();
@@ -118,15 +111,12 @@ public class PlayerController : MonoBehaviour
     
     void CheckGrounded()
     {
-        bool wasGrounded = isGrounded;
-        
         if (groundCheck != null)
         {
             isGrounded = Physics.CheckSphere(groundCheck.position, groundDistance, groundMask);
         }
         else
         {
-            // Optimización: Solo raycast si no hay groundCheck
             isGrounded = Physics.Raycast(transform.position, Vector3.down, 1.1f, groundMask);
         }
     }
@@ -145,9 +135,8 @@ public class PlayerController : MonoBehaviour
         float vertical = Input.GetAxis("Vertical");
         
         Vector3 movement = new Vector3(horizontal * currentSpeed, 0f, vertical * currentSpeed);
-        
-        // Optimización: Limitar velocidad máxima para evitar aceleración infinita
         Vector3 horizontalVelocity = new Vector3(rb.velocity.x, 0f, rb.velocity.z);
+        
         if (horizontalVelocity.magnitude < maxVelocity)
         {
             rb.AddForce(movement);
@@ -156,11 +145,9 @@ public class PlayerController : MonoBehaviour
     
     void Jump()
     {
-        // Resetear solo velocidad Y para salto más consistente
         Vector3 velocity = rb.velocity;
         velocity.y = 0;
         rb.velocity = velocity;
-        
         rb.AddForce(Vector3.up * jumpForce, ForceMode.Impulse);
     }
     
@@ -168,8 +155,7 @@ public class PlayerController : MonoBehaviour
     {
         bool powerUpChanged = false;
         
-        // Optimización: Usar for normal y break cuando sea necesario
-        for (int i = 0; i < activePowerUps.Count; i++)
+        for (int i = activePowerUps.Count - 1; i >= 0; i--)
         {
             activePowerUps[i].remainingTime -= Time.deltaTime;
             
@@ -177,7 +163,6 @@ public class PlayerController : MonoBehaviour
             {
                 RemovePowerUp(activePowerUps[i].type);
                 activePowerUps.RemoveAt(i);
-                i--; // Ajustar índice después de RemoveAt
                 powerUpChanged = true;
             }
         }
@@ -190,14 +175,8 @@ public class PlayerController : MonoBehaviour
     
     public void ApplyPowerUp(PowerUpData powerUpData)
     {
-        if (powerUpData == null)
-        {
-            Debug.LogWarning("PowerUpData es null");
-            return;
-        }
-        
-        // Remover powerup existente del mismo tipo
-        RemovePowerUp(powerUpData.type);
+       
+        RemovePowerUpOfType(powerUpData.type);
         
         ActivePowerUp newPowerUp = new ActivePowerUp(
             powerUpData.type, 
@@ -210,8 +189,7 @@ public class PlayerController : MonoBehaviour
         
         ApplyPowerUpEffects(powerUpData);
         powerUpUINeedsUpdate = true;
-        
-        Debug.Log($"Power-up {powerUpData.displayName} aplicado por {powerUpData.duration}s");
+       
     }
     
     void ApplyPowerUpEffects(PowerUpData powerUp)
@@ -228,42 +206,57 @@ public class PlayerController : MonoBehaviour
                 break;
                 
             case PowerUpType.Jump:
-                // Power-up de salto múltiple - sin efectos inmediatos
                 break;
                 
             case PowerUpType.DoubleCoins:
                 coinMultiplier = Mathf.RoundToInt(powerUp.multiplier);
+                Debug.Log($"Coin multiplier activado: x{coinMultiplier} por {powerUp.duration}s");
+                break;
+                
+            case PowerUpType.InstantWin:
+                InstantWin();
                 break;
         }
     }
     
-    void RemovePowerUp(PowerUpType type)
+    void RemovePowerUpOfType(PowerUpType type)
     {
-        // Remover de la lista activa
         for (int i = activePowerUps.Count - 1; i >= 0; i--)
         {
             if (activePowerUps[i].type == type)
             {
                 activePowerUps.RemoveAt(i);
-                break;
             }
         }
         
         powerUpStates[type] = false;
-        
+        RemovePowerUpEffect(type);
+    }
+    
+    void RemovePowerUp(PowerUpType type)
+    {
+        powerUpStates[type] = false;
+        RemovePowerUpEffect(type);
+    }
+    
+    void RemovePowerUpEffect(PowerUpType type)
+    {
         switch (type)
         {
             case PowerUpType.Speed:
                 currentSpeed = baseSpeed;
+                Debug.Log("Speed power-up terminado");
                 break;
                 
             case PowerUpType.Invincibility:
                 if (playerRenderer != null && originalMaterial != null)
                     playerRenderer.material = originalMaterial;
+                Debug.Log("Invincibility power-up terminado");
                 break;
                 
             case PowerUpType.DoubleCoins:
                 coinMultiplier = 1;
+                Debug.Log("Double coins power-up terminado - multiplicador reset a x1");
                 break;
         }
         
@@ -287,18 +280,12 @@ public class PlayerController : MonoBehaviour
         if (audioSource != null)
             audioSource.Play();
         
-        coinCount += coinMultiplier;
+        int coinsToAdd = coinMultiplier;
+        coinCount += coinsToAdd;
         
         ShowParticleEffect(coin.transform.position);
-        
         coin.SetActive(false);
-        
         uiNeedsUpdate = true;
-        
-        if (coinCount >= coinsToWin)
-        {
-            LoadNextLevel();
-        }
     }
     
     void CollectPowerUp(GameObject powerUpObj)
@@ -323,7 +310,11 @@ public class PlayerController : MonoBehaviour
     
     void UpdateUI()
     {
-        if (coinText != null)
+        if (gameManager != null)
+        {
+            gameManager.UpdateCoinUI(coinCount, coinsToWin);
+        }
+        else if (coinText != null)
         {
             coinText.text = $"Monedas: {coinCount}/{coinsToWin}";
         }
@@ -331,7 +322,11 @@ public class PlayerController : MonoBehaviour
     
     void UpdatePowerUpUI()
     {
-        if (powerUpText != null)
+        if (gameManager != null)
+        {
+            gameManager.UpdatePowerUpUI(activePowerUps);
+        }
+        else if (powerUpText != null)
         {
             if (activePowerUps.Count == 0)
             {
@@ -342,13 +337,28 @@ public class PlayerController : MonoBehaviour
             System.Text.StringBuilder sb = new System.Text.StringBuilder();
             foreach (var powerUp in activePowerUps)
             {
-                sb.AppendLine($"{powerUp.type}: {powerUp.remainingTime:F1}s");
+                string powerUpName = GetPowerUpDisplayName(powerUp.type);
+                sb.AppendLine($"{powerUpName}: {powerUp.remainingTime:F1}s");
             }
             powerUpText.text = sb.ToString();
         }
     }
     
-    void LoadNextLevel()
+    string GetPowerUpDisplayName(PowerUpType type)
+    {
+        switch (type)
+        {
+            case PowerUpType.Speed: return "Velocidad";
+            case PowerUpType.Invincibility: return "Invencibilidad";
+            case PowerUpType.Jump: return "Super Salto";
+            case PowerUpType.DoubleCoins: return $"Monedas x{coinMultiplier}";
+            case PowerUpType.InstantWin: return "Victoria Instant";
+            default: return type.ToString();
+        }
+    }
+    
+    // Método público para que el portal pueda cargar el siguiente nivel
+    public void LoadNextLevel()
     {
         if (nextSceneIndex < SceneManager.sceneCountInBuildSettings)
         {
@@ -363,61 +373,35 @@ public class PlayerController : MonoBehaviour
     void InstantWin()
     {
         Debug.Log("¡Power-up de victoria instantánea activado!");
-        
-        // Mostrar mensaje en UI
-        if (coinText != null)
-        {
-            coinText.text = "¡VICTORIA INSTANTÁNEA!";
-        }
-        
-        if (powerUpText != null)
-        {
-            powerUpText.text = "¡Nivel Completado!";
-        }
-        
-        // Iniciar corrutina para esperar 10 segundos
         StartCoroutine(WinSequence("¡Power-up de Victoria Secreta!"));
     }
     
     void NormalWin()
     {
         Debug.Log("¡Todas las monedas recolectadas!");
-        
-        // Mostrar mensaje en UI
-        if (coinText != null)
-        {
-            coinText.text = $"¡COMPLETADO! {coinCount}/{coinsToWin}";
-        }
-        
-        if (powerUpText != null)
-        {
-            powerUpText.text = "¡Todas las monedas recolectadas!";
-        }
-        
-        // Iniciar corrutina para esperar 10 segundos
         StartCoroutine(WinSequence("¡Nivel Completado!"));
     }
     
-    private System.Collections.IEnumerator WinSequence(string winMessage)
+    private IEnumerator WinSequence(string winMessage)
     {
-        Debug.Log(winMessage);
         
-        // Esperar 10 segundos
-        float countdown = 10f;
+        if (coinText != null)
+        {
+            coinText.text = winMessage;
+        }
+        
+        float countdown = 3f;
         while (countdown > 0)
         {
-            // Opcional: Mostrar countdown en UI
             if (powerUpText != null)
             {
-                powerUpText.text = $"{winMessage}\nCambiando en: {countdown:F1}s";
+                powerUpText.text = $"Cambiando en: {countdown:F1}s";
             }
             
             countdown -= Time.deltaTime;
             yield return null;
         }
-        
-        // Cambiar de escena
-        Debug.Log("Cambiando a la siguiente escena...");
+       
         LoadNextLevel();
     }
     
