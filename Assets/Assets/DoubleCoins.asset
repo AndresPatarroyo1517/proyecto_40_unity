@@ -13,7 +13,9 @@ MonoBehaviour:
   m_Name: DoubleCoins
   m_EditorClassIdentifier: 
   type: 3
-  duration: 4
+  duration: 10
   multiplier: 2
   displayName: '"Se ha aplicado un buff de dobles monedas"'
-  effectColor: {r: 1, g: 1, b: 1, a: 1}
+  description: "Descripci\xF3n del power-up"
+  effectColor: {r: 1, g: 0.9319705, b: 0.07075471, a: 1}
+  icon: {fileID: 0}
